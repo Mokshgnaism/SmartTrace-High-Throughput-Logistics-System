@@ -10,23 +10,20 @@ import com.zaxxer.hikari.HikariDataSource;
 import EntryPoint.generator.LabelGenerator;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import javax.sql.DataSource;
 
 @Service
 public class GeneratorService {
     public static final byte[] POISON = new byte[]{-1};
-
-
-
+    private DataSource ds;
+    public GeneratorService(DataSource ds) {
+        this.ds = ds;
+    }
     public  void Generate(int noOfPallets,int cartonsPerPallet,int unitsPerCarton,String companyPrefix,String factoryId,String employeeId,String jobId) throws IOException, InterruptedException {
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
-        config.setUsername("postgres");
-        config.setPassword("Mokshgna@123");
 
-        config.setMaximumPoolSize(16);
-        config.setAutoCommit(false);
-        HikariDataSource ds = new HikariDataSource(config);
 
         ArrayBlockingQueue<byte[]> palletQueue = new ArrayBlockingQueue<>(200_000);
         ArrayBlockingQueue<byte[]> cartonQueue = new ArrayBlockingQueue<>(200_000);

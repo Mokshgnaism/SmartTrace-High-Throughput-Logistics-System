@@ -8,6 +8,8 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,9 +18,11 @@ import java.util.List;
 
 @Component
 public class DBfetch {
-    public HikariDataSource ds;
+//    public HikariDataSource ds;
     private final GeneratorService generatorService;
     private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+    public DataSource ds;
+
     public static String toHex(byte[] bytes) {
 
         char[] hexChars = new char[bytes.length * 2];
@@ -29,16 +33,9 @@ public class DBfetch {
         }
         return new String(hexChars);
     }
-    DBfetch(HikariDataSource ds, GeneratorService generatorService) {
+    DBfetch(DataSource ds, GeneratorService generatorService) {
         this.generatorService = generatorService;
-        HikariConfig config = new HikariConfig();
-        config = new HikariConfig();
-        config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
-        config.setUsername("postgres");
-        config.setPassword("Mokshgna@123");
-        config.setMaximumPoolSize(16);
-        config.setAutoCommit(false);
-        this.ds = new HikariDataSource(config);
+        this.ds = ds;
     }
     public void getUnitsByJobId(byte[]jobIdBytes,List<Unit>units) throws SQLException {
 //        List<Unit> units = new ArrayList<>();
@@ -47,15 +44,14 @@ public class DBfetch {
             PreparedStatement ps = conn.prepareStatement(
                     "SELECT serial_id,parent_carton_id,hash,hash_prefix FROM units WHERE job_id = ?"
             );
-
             ps.setBytes(1, jobIdBytes);
 
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
 
-                String serialId = toHex(rs.getBytes("serial_id"));
-                String parentCarton = toHex(rs.getBytes("parent_carton_id"));
+                String serialId = new String(rs.getBytes("serial_id"), StandardCharsets.UTF_8);
+                String parentCarton = new String(rs.getBytes("parent_carton_id"),StandardCharsets.UTF_8);
                 String hash = toHex(rs.getBytes("hash"));
                 String hashPrefix = toHex(rs.getBytes("hash_prefix"));
 
@@ -66,6 +62,7 @@ public class DBfetch {
             throw new RuntimeException("errror from unit generation controller"+e);
         }
     }
+
     public void getCartonsByJobId(byte[] jobIdBytes,List<Carton>cartons) throws SQLException {
 //        List<Carton> cartons = new ArrayList<>();
         try (var conn = ds.getConnection()) {
@@ -78,8 +75,8 @@ public class DBfetch {
 
             while (rs.next()) {
 
-                String serialId = toHex(rs.getBytes("serial_id"));
-                String parentPallet = toHex(rs.getBytes("parent_pallet_id"));
+                String serialId = new String(rs.getBytes("serial_id"),StandardCharsets.UTF_8);
+                String parentPallet = new String(rs.getBytes("parent_pallet_id"),StandardCharsets.UTF_8);
                 String hash = toHex(rs.getBytes("hash"));
                 String hashPrefix = toHex(rs.getBytes("hash_prefix"));
 
@@ -103,8 +100,8 @@ public class DBfetch {
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
-                String serialId = toHex(rs.getBytes("ssic"));
-                String hash = toHex(rs.getBytes("hash"));
+                String serialId = new String(rs.getBytes("ssic"),StandardCharsets.UTF_8);
+                String hash = new String(rs.getBytes("hash"),StandardCharsets.UTF_8);
                 String hashPrefix = toHex(rs.getBytes("hash_prefix"));
                 pallets.add(new Pallet(serialId, hash, hashPrefix, null));
             }

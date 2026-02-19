@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import EntryPoint.generator.LabelGenerator;
 import EntryPoint.service.GeneratorService;
 
+import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.sql.PreparedStatement;
@@ -44,20 +45,12 @@ public class generateController {
     private static ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final SecureRandom random = new SecureRandom();
     private DBfetch dbfetch;
+    private DataSource ds;
 
-
-    public HikariDataSource ds ;
-    public generateController(GeneratorService generatorService, DBfetch dbfetch) {
+    public generateController(GeneratorService generatorService, DBfetch dbfetch, DataSource ds) {
         this.generatorService = generatorService;
         this.dbfetch = dbfetch;
-        HikariConfig config = new HikariConfig();
-        config = new HikariConfig();
-        config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
-        config.setUsername("postgres");
-        config.setPassword("Mokshgna@123");
-        config.setMaximumPoolSize(16);
-        config.setAutoCommit(false);
-        ds = new HikariDataSource(config);
+        this.ds = ds;
     }
 
 // async version of the api . will be implementing later . dont have time now
