@@ -38,7 +38,7 @@ public class DBfetch {
         config.setPassword("Mokshgna@123");
         config.setMaximumPoolSize(16);
         config.setAutoCommit(false);
-        ds = new HikariDataSource(config);
+        this.ds = new HikariDataSource(config);
     }
     public void getUnitsByJobId(byte[]jobIdBytes,List<Unit>units) throws SQLException {
 //        List<Unit> units = new ArrayList<>();
