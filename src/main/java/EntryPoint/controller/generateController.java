@@ -14,6 +14,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,6 +57,7 @@ public class generateController {
 // async version of the api . will be implementing later . dont have time now
 // we can use the Redis to store the jobs . and then we can do it but for now maybe just make it syncronous .
 //    parital implementation only
+    @PreAuthorize("hasAuthority('MANAGER')")
     @PostMapping("/generate")
     public ResponseEntity<?> generate(@RequestBody GenerateRequest generateRequest) {
         byte[] bytes = new byte[8]; // 8 bytes = short but good randomness
@@ -85,6 +87,8 @@ public class generateController {
         return new ResponseEntity<>(new GenerateRequestResponse("sorry"), HttpStatus.CREATED);
     }
 
+
+    @PreAuthorize("hasAuthority('EMPLOYEE')")
     @PostMapping("/generateImmediate")
     public ResponseEntity<?> generateAndSend(@RequestBody GenerateRequest generateRequest) {
         byte[] bytes = new byte[8];
