@@ -18,7 +18,7 @@ public class GeneratorService {
 
 
 
-    public  void Generate(int noOfPallets,int cartonsPerPallet,int unitsPerCarton,String companyPrefix,String factoryId,String employeeId) throws IOException, InterruptedException {
+    public  void Generate(int noOfPallets,int cartonsPerPallet,int unitsPerCarton,String companyPrefix,String factoryId,String employeeId,String jobId) throws IOException, InterruptedException {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
         config.setUsername("postgres");
@@ -56,7 +56,7 @@ public class GeneratorService {
 
             palletCFS.add(CompletableFuture.runAsync(() -> {
                 try {
-                    LabelGenerator.generatePalletIdsAndInsert(startIdx,endIdx,palletQueue,pos,companyPrefix,factoryId,employeeId);
+                    LabelGenerator.generatePalletIdsAndInsert(startIdx,endIdx,palletQueue,pos,companyPrefix,factoryId,employeeId,jobId);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -67,7 +67,7 @@ public class GeneratorService {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY pallets(ssic,hash,hash_prefix) FROM STDIN WITH CSV",pis);
+                    copyManager.copyIn("COPY pallets(ssic,hash,hash_prefix,job_id) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     e.printStackTrace();
@@ -83,7 +83,7 @@ public class GeneratorService {
             pis = new PipedInputStream(pos,1024*64);
             cartonCFS.add(CompletableFuture.runAsync(() -> {
                 try {
-                    LabelGenerator.generateCartonIdsAndInsert(palletQueue,cartonQueue,pos,cartonsPerPallet,POISON);
+                    LabelGenerator.generateCartonIdsAndInsert(palletQueue,cartonQueue,pos,cartonsPerPallet,POISON,jobId);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 } catch (IOException e) {
@@ -96,7 +96,7 @@ public class GeneratorService {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY cartons(serial_id,parent_pallet_id,hash,hash_prefix) FROM STDIN WITH CSV",pis);
+                    copyManager.copyIn("COPY cartons(serial_id,parent_pallet_id,hash,hash_prefix,job_id) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     throw new RuntimeException(e);
@@ -109,7 +109,7 @@ public class GeneratorService {
             PipedInputStream pis = new PipedInputStream(pos,1024*64);
             unitCFS.add(CompletableFuture.runAsync(() -> {
                 try {
-                    LabelGenerator.generateUnitIdsAndInsert(cartonQueue,unitsPerCarton,POISON,pos);
+                    LabelGenerator.generateUnitIdsAndInsert(cartonQueue,unitsPerCarton,POISON,pos,jobId);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 } catch (IOException e) {
@@ -122,7 +122,7 @@ public class GeneratorService {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY units(serial_id,parent_carton_id,hash,hash_prefix) FROM STDIN WITH CSV",pis);
+                    copyManager.copyIn("COPY units(serial_id,parent_carton_id,hash,hash_prefix,job_id) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     throw new RuntimeException(e);

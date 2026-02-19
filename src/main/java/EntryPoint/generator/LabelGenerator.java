@@ -29,6 +29,22 @@ public class LabelGenerator {
             w.write(HEX[v & 0x0F]);
         }
     }
+    private static byte[] byteaHexBytes(byte[] data, int len) {
+        byte[] out = new byte[2 + len * 2]; // \x + hex chars
+
+        out[0] = '\\';
+        out[1] = 'x';
+
+        int idx = 2;
+        for (int i = 0; i < len; i++) {
+            int v = data[i] & 0xFF;
+            out[idx++] = HEX[v >>> 4];
+            out[idx++] = HEX[v & 0x0F];
+        }
+        return out;
+    }
+
+
 
 
     private static int writeIntAscii(int value, byte[] buffer, int offset) {
@@ -52,11 +68,15 @@ public class LabelGenerator {
     }
 
     //    total micro optimisations making sure we use the strings as low as possible.
-    public static void generatePalletIdsAndInsert(int start,int end,ArrayBlockingQueue<byte[]>PalletQueue, PipedOutputStream pos,String companyPrefix,String factoryId,String employeeId)throws Exception{
+    public static void generatePalletIdsAndInsert(int start,int end,ArrayBlockingQueue<byte[]>PalletQueue, PipedOutputStream pos,String companyPrefix,String factoryId,String employeeId,String jobId)throws Exception{
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String prefix = companyPrefix+factoryId+employeeId+timestamp;
         final byte []prefixBytes = prefix.getBytes(StandardCharsets.UTF_8);
         LabelCrypto.prefix = prefixBytes;
+        byte[] rawJobId = jobId.getBytes(StandardCharsets.UTF_8);
+        byte[] jobIdHex = byteaHexBytes(rawJobId, rawJobId.length);
+
+
 //        we can use the streaming version for the hash api we will see which one is better .. later for now lets keep it simple and move on withour current one
 //        and both are having literally equal tradeoff . but if prefix length is dominant i think i should considder going for the streaimign api only
         final byte comma = ',';
@@ -85,14 +105,19 @@ public class LabelGenerator {
 
 //            writer.write(hash, 0, Math.min(8, hash.length));
             writeByteaHex(writer,hash,Math.min(8, hash.length));
+            writer.write(comma);
+
+            writer.write(jobIdHex);
             writer.write(newLine);
 
         }
         writer.close();
     }
 
-    public static void generateCartonIdsAndInsert(ArrayBlockingQueue<byte[]>palletQueue,ArrayBlockingQueue<byte[]>cartonQueue,PipedOutputStream pos,int cartonsPerPallet,byte []poison) throws InterruptedException, IOException {
+    public static void generateCartonIdsAndInsert(ArrayBlockingQueue<byte[]>palletQueue,ArrayBlockingQueue<byte[]>cartonQueue,PipedOutputStream pos,int cartonsPerPallet,byte []poison,String jobId) throws InterruptedException, IOException {
         BufferedOutputStream writer = new BufferedOutputStream(pos,1024*64);
+        byte[] rawJobId = jobId.getBytes(StandardCharsets.UTF_8);
+        byte[] jobIdHex = byteaHexBytes(rawJobId, rawJobId.length);
         while(true){
             byte [] parentPaletSerialId = palletQueue.take();
 //            we have to make sure we are correctly sending the address... this will actually compare address not the value..... and this is faster than checking the original value .
@@ -131,6 +156,9 @@ public class LabelGenerator {
                 writer.write(comma);
 
                 writeByteaHex(writer,hash,Math.min(8, hash.length));
+                writer.write(comma);
+
+                writer.write(jobIdHex);
                 writer.write(newline);
 
             }
@@ -138,8 +166,10 @@ public class LabelGenerator {
         }
         writer.close();
     }
-    public static void generateUnitIdsAndInsert(ArrayBlockingQueue<byte[]>cartonQueue,int unitsPerCarton,byte[]poison,PipedOutputStream pos) throws InterruptedException, IOException {
+    public static void generateUnitIdsAndInsert(ArrayBlockingQueue<byte[]>cartonQueue,int unitsPerCarton,byte[]poison,PipedOutputStream pos,String jobId) throws InterruptedException, IOException {
         BufferedOutputStream writer = new BufferedOutputStream(pos,1024*64);
+        byte[] rawJobId = jobId.getBytes(StandardCharsets.UTF_8);
+        byte[] jobIdHex = byteaHexBytes(rawJobId, rawJobId.length);
         while(true){
             byte [] parentCartonSerialId = cartonQueue.take();
             if(parentCartonSerialId==poison){
@@ -172,6 +202,9 @@ public class LabelGenerator {
                 writer.write(comma);
 
                 writeByteaHex(writer,hash,Math.min(8, hash.length));
+                writer.write(comma);
+
+                writer.write(jobIdHex);
                 writer.write(newline);
             }
         }
