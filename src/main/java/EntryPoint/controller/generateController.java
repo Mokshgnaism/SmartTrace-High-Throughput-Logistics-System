@@ -1,5 +1,6 @@
 package EntryPoint.controller;
 
+import EntryPoint.dbService.DBfetch;
 import EntryPoint.dto.GenerateRequest;
 import EntryPoint.model.Carton;
 import EntryPoint.model.Employee;
@@ -24,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.io.IOException;
@@ -41,22 +43,13 @@ public class generateController {
     private final GeneratorService generatorService;
     private static ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final SecureRandom random = new SecureRandom();
-    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
-
-    public static String toHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars);
-    }
+    private DBfetch dbfetch;
 
 
     public HikariDataSource ds ;
-    public generateController(GeneratorService generatorService) {
+    public generateController(GeneratorService generatorService, DBfetch dbfetch) {
         this.generatorService = generatorService;
+        this.dbfetch = dbfetch;
         HikariConfig config = new HikariConfig();
         config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
@@ -124,101 +117,38 @@ public class generateController {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-        });
-
+        },executor);
+        cf1.join();
         List<Unit> ls = new ArrayList<>();
         List<Carton> lCartons = new ArrayList<>();
         List<Pallet> lPallets = new ArrayList<>();
 
         byte[] jobIdBytes = jobId.getBytes(StandardCharsets.UTF_8);
 
-        CompletableFuture<Void> unitsCF = CompletableFuture.runAsync(() -> {
-
-            try (var conn = ds.getConnection()) {
-
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT serial_id,parent_carton_id,hash,hash_prefix FROM units WHERE job_id = ?"
-                );
-
-                ps.setBytes(1, jobIdBytes);
-
-                ResultSet rs = ps.executeQuery();
-
-                while (rs.next()) {
-
-                    String serialId = toHex(rs.getBytes("serial_id"));
-                    String parentCarton = toHex(rs.getBytes("parent_carton_id"));
-                    String hash = toHex(rs.getBytes("hash"));
-                    String hashPrefix = toHex(rs.getBytes("hash_prefix"));
-
-                    ls.add(new Unit(serialId, hash, hashPrefix, parentCarton));
-                }
-
-            } catch (Exception e) {
-                throw new RuntimeException("error fetching units", e);
+        CompletableFuture<Integer> unitsCF = CompletableFuture.supplyAsync(()->{
+            try {
+                dbfetch.getUnitsByJobId(jobIdBytes,ls);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-
-        }, executor);
-
-
-
-        CompletableFuture<Void> cartonsCF = CompletableFuture.runAsync(() -> {
-
-            try (var conn = ds.getConnection()) {
-
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT serial_id,parent_pallet_id,hash,hash_prefix FROM cartons WHERE job_id = ?"
-                );
-
-                ps.setBytes(1, jobIdBytes);
-
-                ResultSet rs = ps.executeQuery();
-
-                while (rs.next()) {
-
-                    String serialId = toHex(rs.getBytes("serial_id"));
-                    String parentPallet = toHex(rs.getBytes("parent_pallet_id"));
-                    String hash = toHex(rs.getBytes("hash"));
-                    String hashPrefix = toHex(rs.getBytes("hash_prefix"));
-
-                    lCartons.add(new Carton(serialId, hash, hashPrefix, parentPallet));
-                }
-
-            } catch (Exception e) {
-                throw new RuntimeException("error fetching cartons", e);
+            return -1;
+        },executor);
+        CompletableFuture<Integer>cartonsCF = CompletableFuture.supplyAsync(()->{
+            try {
+                dbfetch.getCartonsByJobId(jobIdBytes,lCartons);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-
-        }, executor);
-
-
-
-        CompletableFuture<Void> palletsCF = CompletableFuture.runAsync(() -> {
-
-            try (var conn = ds.getConnection()) {
-
-                PreparedStatement ps = conn.prepareStatement(
-                        "SELECT ssic,hash,hash_prefix FROM pallets WHERE job_id = ?"
-                );
-
-                ps.setBytes(1, jobIdBytes);
-
-                ResultSet rs = ps.executeQuery();
-
-                while (rs.next()) {
-
-                    String serialId = toHex(rs.getBytes("ssic"));
-                    String hash = toHex(rs.getBytes("hash"));
-                    String hashPrefix = toHex(rs.getBytes("hash_prefix"));
-
-                    lPallets.add(new Pallet(serialId, hash, hashPrefix, null));
-                }
-
-            } catch (Exception e) {
-                throw new RuntimeException("error fetching pallets", e);
+            return -1;
+        },executor);
+        CompletableFuture<Integer>palletsCF = CompletableFuture.supplyAsync(()->{
+            try {
+                dbfetch.getPalletsByJobId(jobIdBytes,lPallets);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-
-
-        }, executor);
+            return -1;
+        },executor);
 // wait for all
         CompletableFuture.allOf(unitsCF, cartonsCF, palletsCF).join();
         return new ResponseEntity<>(new SendRequestResponse(ls,lCartons,lPallets), HttpStatus.OK);
